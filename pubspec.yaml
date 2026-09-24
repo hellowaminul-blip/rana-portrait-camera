@@ -1,0 +1,17 @@
+name: rana_portrait_camera
+description: "Rana Portrait Camera App"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  camera: ^0.10.5+9
+  http: ^1.2.0
+  path_provider: ^2.1.2
+
+flutter:
+  uses-material-design: true
