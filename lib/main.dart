@@ -34,24 +34,32 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
   bool isProcessing = false;
   double processPercentage = 0.0;
   String statusMessage = "";
-  File? processedImage;
   Uint8List? processedBytes;
   final ImagePicker _picker = ImagePicker();
 
-  // আপনার রানিং Localtunnel URL
-  final String apiUrl = "https://violet-animals-float.loca.lt/process-portrait/";
+  // স্থায়ী Hugging Face API URL
+  final String apiUrl = "https://hellowaminul-rana-portrait-api.hf.space/process-portrait/";
 
   @override
   void initState() {
     super.initState();
-    if (cameras.isNotEmpty) {
-      controller = CameraController(cameras[0], ResolutionPreset.max);
-      controller!.initialize().then((_) {
-        if (!mounted) return;
-        setState(() {});
-      });
-    }
+    initCamera();
     requestPermissions();
+  }
+
+  Future<void> initCamera() async {
+    if (cameras.isNotEmpty) {
+      controller = CameraController(
+        cameras[0],
+        ResolutionPreset.high,
+        enableAudio: false,
+      );
+      await controller!.initialize();
+      // ফ্ল্যাশ লাইট বন্ধ রাখা
+      await controller!.setFlashMode(FlashMode.off);
+      if (!mounted) return;
+      setState(() {});
+    }
   }
 
   Future<void> requestPermissions() async {
@@ -77,6 +85,8 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
     if (controller == null || !controller!.value.isInitialized || isProcessing) return;
 
     try {
+      // নিশ্চিত করা যেন ছবি তোলার আগে ফ্ল্যাশ বন্ধ থাকে
+      await controller!.setFlashMode(FlashMode.off);
       final image = await controller!.takePicture();
       processImageFile(File(image.path));
     } catch (e) {
@@ -87,7 +97,6 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
   Future<void> processImageFile(File rawImageFile) async {
     setState(() {
       isProcessing = true;
-      processedImage = null;
       processedBytes = null;
       processPercentage = 0.05;
       statusMessage = "ছবি প্রস্তুত করা হচ্ছে...";
@@ -98,7 +107,6 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
       
       var uri = Uri.parse(apiUrl);
       var request = http.MultipartRequest('POST', uri);
-      request.headers['Bypass-Tunnel-Reminder'] = 'true';
       
       var fileStream = http.ByteStream(rawImageFile.openRead());
       var length = await rawImageFile.length();
@@ -114,7 +122,7 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
 
       updateProgress(0.35, "ছবি আপলোড হচ্ছে (৩৫%)...");
 
-      var streamedResponse = await request.send().timeout(const Duration(seconds: 60));
+      var streamedResponse = await request.send().timeout(const Duration(seconds: 90));
       
       updateProgress(0.65, "AI পোর্ট্রেট প্রসেসিং হচ্ছে (৬৫%)...");
 
@@ -138,8 +146,7 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
 
         updateProgress(0.95, "গ্যালারিতে সেভ করা হচ্ছে...");
 
-        // ImageGallerySaver দিয়ে গ্যালারিতে সরাসরি সেভ
-        final result = await ImageGallerySaver.saveImage(
+        await ImageGallerySaver.saveImage(
           imageBytes,
           quality: 100,
           name: "AI_Portrait_${DateTime.now().millisecondsSinceEpoch}",
@@ -152,14 +159,14 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
           isProcessing = false;
         });
 
-        showDialogMsg("Success", "ছবিটি সফলভাবে প্রসেসড হয়েছে এবং ফোনের গ্যালারিতে সেভ হয়ে গেছে!");
+        showDialogMsg("Success", "ছবিটি সফলভাবে প্রসেসড হয়েছে এবং গ্যালারিতে সেভ করা হয়েছে!");
       } else {
         setState(() => isProcessing = false);
-        showDialogMsg("Server Failure", "সার্ভার রেসপন্স দেয়নি (Code: ${streamedResponse.statusCode})। Localtunnel রান আছে কিনা চেক করুন।");
+        showDialogMsg("Server Failure", "সার্ভার এরর (Code: ${streamedResponse.statusCode})। Hugging Face Space চালু আছে কিনা চেক করুন।");
       }
     } catch (e) {
       setState(() => isProcessing = false);
-      showDialogMsg("Connection Error", "সমস্যা: $e\nইন্টারনেট বা সার্ভার কানেকশন চেক করুন।");
+      showDialogMsg("Connection Error", "সমস্যা: $e\nইন্টারনেট কানেকশন চেক করুন।");
     }
   }
 
@@ -180,20 +187,30 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
   }
 
   @override
+  void dispose() {
+    controller?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
+          // ক্যামেরা প্রিভিউ এবং অ্যাসপেক্ট রেশিও হ্যান্ডলিং
           if (processedBytes != null)
             Positioned.fill(
               child: Image.memory(processedBytes!, fit: BoxFit.contain),
             )
           else if (controller != null && controller!.value.isInitialized)
-            Positioned.fill(child: CameraPreview(controller!))
+            Center(
+              child: CameraPreview(controller!),
+            )
           else
             const Center(child: CircularProgressIndicator(color: Colors.white)),
 
+          // প্রসেসিং ওভারলে
           if (isProcessing)
             Container(
               color: Colors.black87,
@@ -231,6 +248,7 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
               ),
             ),
 
+          // ব্যাক বাটন
           if (processedBytes != null && !isProcessing)
             Positioned(
               top: 50,
@@ -248,6 +266,7 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
               ),
             ),
 
+          // ক্যামেরা ও গ্যালারি কন্ট্রোল
           if (processedBytes == null && !isProcessing)
             Positioned(
               bottom: 40,
