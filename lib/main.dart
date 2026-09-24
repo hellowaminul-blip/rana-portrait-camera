@@ -37,7 +37,7 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
   Uint8List? processedBytes;
   final ImagePicker _picker = ImagePicker();
 
-  // স্থায়ী Hugging Face API URL
+  // Hugging Face Direct API Endpoint
   final String apiUrl = "https://hellowaminul-rana-portrait-api.hf.space/process-portrait/";
 
   @override
@@ -55,7 +55,6 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
         enableAudio: false,
       );
       await controller!.initialize();
-      // ফ্ল্যাশ লাইট বন্ধ রাখা
       await controller!.setFlashMode(FlashMode.off);
       if (!mounted) return;
       setState(() {});
@@ -85,7 +84,6 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
     if (controller == null || !controller!.value.isInitialized || isProcessing) return;
 
     try {
-      // নিশ্চিত করা যেন ছবি তোলার আগে ফ্ল্যাশ বন্ধ থাকে
       await controller!.setFlashMode(FlashMode.off);
       final image = await controller!.takePicture();
       processImageFile(File(image.path));
@@ -166,7 +164,7 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
       }
     } catch (e) {
       setState(() => isProcessing = false);
-      showDialogMsg("Connection Error", "সমস্যা: $e\nইন্টারনেট কানেকশন চেক করুন।");
+      showDialogMsg("Connection Error", "সমস্যা: $e\nইন্টারনেট কানেকশন বা URL চেক করুন।");
     }
   }
 
@@ -198,7 +196,6 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // ক্যামেরা প্রিভিউ এবং অ্যাসপেক্ট রেশিও হ্যান্ডলিং
           if (processedBytes != null)
             Positioned.fill(
               child: Image.memory(processedBytes!, fit: BoxFit.contain),
@@ -210,7 +207,6 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
           else
             const Center(child: CircularProgressIndicator(color: Colors.white)),
 
-          // প্রসেসিং ওভারলে
           if (isProcessing)
             Container(
               color: Colors.black87,
@@ -248,7 +244,6 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
               ),
             ),
 
-          // ব্যাক বাটন
           if (processedBytes != null && !isProcessing)
             Positioned(
               top: 50,
@@ -266,7 +261,6 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
               ),
             ),
 
-          // ক্যামেরা ও গ্যালারি কন্ট্রোল
           if (processedBytes == null && !isProcessing)
             Positioned(
               bottom: 40,
