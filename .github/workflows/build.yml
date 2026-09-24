@@ -10,7 +10,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    
+
     - name: Set up Java
       uses: actions/setup-java@v3
       with:
@@ -22,8 +22,14 @@ jobs:
       with:
         flutter-version: '3.19.x'
 
+    - name: Generate Flutter Skeleton
+      run: |
+        flutter create --org com.rana.portrait --project-name rana_portrait_camera temp_app
+        rsync -av temp_app/ .
+        rm -rf temp_app
+
     - name: Install Dependencies
-      run: flutter create . --org com.rana.portrait
+      run: flutter pub get
 
     - name: Build APK
       run: flutter build apk --release
