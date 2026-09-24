@@ -9,8 +9,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
-
     - name: Set up Java
       uses: actions/setup-java@v3
       with:
@@ -22,20 +20,26 @@ jobs:
       with:
         flutter-version: '3.19.x'
 
-    - name: Generate Flutter Skeleton
-      run: |
-        flutter create --org com.rana.portrait --project-name rana_portrait_camera temp_app
-        rsync -av temp_app/ .
-        rm -rf temp_app
+    - name: Create Base App
+      run: flutter create --org com.rana.portrait --project-name rana_portrait_camera app
 
-    - name: Install Dependencies
-      run: flutter pub get
+    - uses: actions/checkout@v3
+      with:
+        path: custom_code
+
+    - name: Merge Custom Code & Dependencies
+      run: |
+        cd app
+        flutter pub add camera http path_provider
+        cp ../custom_code/lib/main.dart lib/main.dart
 
     - name: Build APK
-      run: flutter build apk --release
+      run: |
+        cd app
+        flutter build apk --release
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v3
       with:
         name: Rana-Portrait-Camera
-        path: build/app/outputs/flutter-apk/app-release.apk
+        path: app/build/app/outputs/flutter-apk/app-release.apk
