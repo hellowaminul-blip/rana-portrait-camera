@@ -22,21 +22,16 @@ jobs:
       with:
         flutter-version: '3.19.0'
 
-    - name: Scaffold Clean Flutter App
+    - name: Clean Build In Subfolder
       run: |
-        flutter create --org com.rana.portrait --project-name rana_portrait_camera temp_app
-        cp -r temp_app/android .
-        cp -r temp_app/ios .
-        rm -rf temp_app
-
-    - name: Get Dependencies
-      run: flutter pub get
-
-    - name: Build APK
-      run: flutter build apk --debug
+        flutter create --org com.rana.portrait --project-name rana_portrait_camera my_app
+        cd my_app
+        flutter pub add camera http path_provider
+        cp ../lib/main.dart lib/main.dart
+        flutter build apk --debug
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: Rana-Portrait-Camera
-        path: build/app/outputs/flutter-apk/app-debug.apk
+        path: my_app/build/app/outputs/flutter-apk/app-debug.apk
