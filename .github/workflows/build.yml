@@ -24,13 +24,14 @@ jobs:
 
     - name: Generate Full Flutter Project Structure
       run: |
-        # একটি সাময়িক Flutter অ্যাপ তৈরি করা
         flutter create --org com.rana.portrait --project-name rana_portrait_camera temp_app
-        
-        # প্রজেক্টের জন্য প্রয়োজনীয় অ্যান্ড্রয়েড ও আইওএস ফোল্ডার কপি করে রুট ডিরেক্টরিতে নিয়ে আসা
         cp -r temp_app/android .
         cp -r temp_app/ios .
         rm -rf temp_app
+
+    - name: Update minSdkVersion for Camera Package
+      run: |
+        sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle
 
     - name: Get Dependencies
       run: flutter pub get
