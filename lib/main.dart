@@ -1,10 +1,11 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:gal/gal.dart';
+import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 List<CameraDescription> cameras = [];
 
@@ -34,6 +35,7 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
   double processPercentage = 0.0;
   String statusMessage = "";
   File? processedImage;
+  Uint8List? processedBytes;
   final ImagePicker _picker = ImagePicker();
 
   // আপনার রানিং Localtunnel URL
@@ -49,6 +51,12 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
         setState(() {});
       });
     }
+    requestPermissions();
+  }
+
+  Future<void> requestPermissions() async {
+    await Permission.storage.request();
+    await Permission.photos.request();
   }
 
   void updateProgress(double percent, String msg) {
@@ -58,7 +66,6 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
     });
   }
 
-  // গ্যালারি থেকে ছবি সিলেক্ট করা
   Future<void> pickFromGallery() async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
@@ -66,7 +73,6 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
     }
   }
 
-  // ক্যামেরা দিয়ে ছবি তোলা
   Future<void> takePhoto() async {
     if (controller == null || !controller!.value.isInitialized || isProcessing) return;
 
@@ -78,11 +84,11 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
     }
   }
 
-  // ছবি সার্ভারে পাঠানো ও প্রসেসিং
   Future<void> processImageFile(File rawImageFile) async {
     setState(() {
       isProcessing = true;
       processedImage = null;
+      processedBytes = null;
       processPercentage = 0.05;
       statusMessage = "ছবি প্রস্তুত করা হচ্ছে...";
     });
@@ -108,19 +114,19 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
 
       updateProgress(0.35, "ছবি আপলোড হচ্ছে (৩৫%)...");
 
-      var streamedResponse = await request.send().timeout(const Duration(seconds: 45));
+      var streamedResponse = await request.send().timeout(const Duration(seconds: 60));
       
-      updateProgress(0.65, "AI পোর্ট্রেট ফিল্টার প্রয়োগ হচ্ছে (৬৫%)...");
+      updateProgress(0.65, "AI পোর্ট্রেট প্রসেসিং হচ্ছে (৬৫%)...");
 
       if (streamedResponse.statusCode == 200) {
         updateProgress(0.85, "প্রসেসড ছবি ডাউনলোড হচ্ছে (৮৫%)...");
         
-        List<int> bytes = [];
+        List<int> bytesList = [];
         int totalReceived = 0;
         int? contentLength = streamedResponse.contentLength;
 
         await for (var chunk in streamedResponse.stream) {
-          bytes.addAll(chunk);
+          bytesList.addAll(chunk);
           totalReceived += chunk.length;
           if (contentLength != null && contentLength > 0) {
             double downloadProgress = 0.85 + ((totalReceived / contentLength) * 0.10);
@@ -128,31 +134,32 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
           }
         }
 
-        updateProgress(0.95, "ফোন গ্যালারিতে সেভ করা হচ্ছে...");
+        Uint8List imageBytes = Uint8List.fromList(bytesList);
 
-        // স্থায়ী ফোল্ডারে ফাইল রাইট
-        final dir = await getTemporaryDirectory();
-        File tempFile = File('${dir.path}/AI_Enhanced_${DateTime.now().millisecondsSinceEpoch}.jpg');
-        await tempFile.writeAsBytes(bytes);
+        updateProgress(0.95, "গ্যালারিতে সেভ করা হচ্ছে...");
 
-        // Gal প্যাকেজ দিয়ে ফোনের গ্যালারিতে আসল সেভ
-        await Gal.putImage(tempFile.path);
+        // ImageGallerySaver দিয়ে গ্যালারিতে সরাসরি সেভ
+        final result = await ImageGallerySaver.saveImage(
+          imageBytes,
+          quality: 100,
+          name: "AI_Portrait_${DateTime.now().millisecondsSinceEpoch}",
+        );
 
         updateProgress(1.0, "সম্পন্ন হয়েছে!");
 
         setState(() {
-          processedImage = tempFile;
+          processedBytes = imageBytes;
           isProcessing = false;
         });
 
-        showDialogMsg("Success", "ছবিটি সফলভাবে AI দিয়ে এনহ্যান্স করা হয়েছে এবং আপনার ফোন গ্যালারিতে সেভ হয়েছে!");
+        showDialogMsg("Success", "ছবিটি সফলভাবে প্রসেসড হয়েছে এবং ফোনের গ্যালারিতে সেভ হয়ে গেছে!");
       } else {
         setState(() => isProcessing = false);
-        showDialogMsg("Server Failure", "সার্ভার রেসপন্স দেয়নি (Code: ${streamedResponse.statusCode})। Localtunnel রানিং আছে কিনা চেক করুন।");
+        showDialogMsg("Server Failure", "সার্ভার রেসপন্স দেয়নি (Code: ${streamedResponse.statusCode})। Localtunnel রান আছে কিনা চেক করুন।");
       }
     } catch (e) {
       setState(() => isProcessing = false);
-      showDialogMsg("Connection Error", "সমস্যা: $e\nইন্টারনেট বা সার্ভার সংযোগ পরীক্ষা করুন।");
+      showDialogMsg("Connection Error", "সমস্যা: $e\nইন্টারনেট বা সার্ভার কানেকশন চেক করুন।");
     }
   }
 
@@ -178,17 +185,15 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // প্রসেস হওয়া ছবি থাকলে সেটি ফুলস্ক্রিন প্রিভিউ দেখাবে
-          if (processedImage != null)
+          if (processedBytes != null)
             Positioned.fill(
-              child: Image.file(processedImage!, fit: BoxFit.contain),
+              child: Image.memory(processedBytes!, fit: BoxFit.contain),
             )
           else if (controller != null && controller!.value.isInitialized)
             Positioned.fill(child: CameraPreview(controller!))
           else
             const Center(child: CircularProgressIndicator(color: Colors.white)),
 
-          // % পার্সেন্টেজ লোডিং প্যানেল
           if (isProcessing)
             Container(
               color: Colors.black87,
@@ -226,8 +231,7 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
               ),
             ),
 
-          // প্রিভিউ থেকে পুনরায় ক্যামেরা মোডে ফেরার বাটন
-          if (processedImage != null && !isProcessing)
+          if (processedBytes != null && !isProcessing)
             Positioned(
               top: 50,
               left: 20,
@@ -237,15 +241,14 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
                   icon: const Icon(Icons.arrow_back, color: Colors.white),
                   onPressed: () {
                     setState(() {
-                      processedImage = null;
+                      processedBytes = null;
                     });
                   },
                 ),
               ),
             ),
 
-          // বটম কন্ট্রোল বার (ক্যামেরা ও গ্যালারি বাটন)
-          if (processedImage == null && !isProcessing)
+          if (processedBytes == null && !isProcessing)
             Positioned(
               bottom: 40,
               left: 0,
@@ -253,14 +256,12 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  // গ্যালারি থেকে ছবি সিলেক্ট করার বাটন
                   FloatingActionButton(
                     heroTag: "gallery_btn",
                     backgroundColor: Colors.grey[800],
                     onPressed: pickFromGallery,
                     child: const Icon(Icons.photo_library, color: Colors.white),
                   ),
-                  // ছবি তোলার শাটান বাটন
                   GestureDetector(
                     onTap: takePhoto,
                     child: Container(
@@ -283,7 +284,7 @@ class _RanaCameraHomeState extends State<RanaCameraHome> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 56), // ব্যালেন্সের জন্য স্পেস
+                  const SizedBox(width: 56),
                 ],
               ),
             ),

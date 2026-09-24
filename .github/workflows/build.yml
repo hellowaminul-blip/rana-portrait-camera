@@ -29,69 +29,11 @@ jobs:
         cp -r temp_app/ios .
         rm -rf temp_app
 
-    - name: Fix Android Build Gradle File Directly
+    - name: Configure Android SDK Versions
       run: |
-        cat << 'GRADLE_EOF' > android/app/build.gradle
-        plugins {
-            id "com.android.application"
-            id "kotlin-android"
-            id "dev.flutter.flutter-gradle-plugin"
-        }
-
-        def localProperties = new Properties()
-        def localPropertiesFile = rootProject.file('local.properties')
-        if (localPropertiesFile.exists()) {
-            localPropertiesFile.withReader('UTF-8') { reader ->
-                localProperties.load(reader)
-            }
-        }
-
-        def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
-        if (flutterVersionCode == null) {
-            flutterVersionCode = '1'
-        }
-
-        def flutterVersionName = localProperties.getProperty('flutter.versionName')
-        if (flutterVersionName == null) {
-            flutterVersionName = '1.0'
-        }
-
-        android {
-            namespace "com.rana.portrait.rana_portrait_camera"
-            compileSdkVersion 34
-
-            compileOptions {
-                sourceCompatibility JavaVersion.VERSION_1_8
-                targetCompatibility JavaVersion.VERSION_1_8
-            }
-
-            kotlinOptions {
-                jvmTarget = '1.8'
-            }
-
-            sourceSets {
-                main.java.srcDirs += 'src/main/kotlin'
-            }
-
-            defaultConfig {
-                applicationId "com.rana.portrait.rana_portrait_camera"
-                minSdkVersion 21
-                targetSdkVersion 34
-                versionCode flutterVersionCode.toInteger()
-                versionName flutterVersionName
-            }
-
-            buildTypes {
-                release {
-                    signingConfig signingConfigs.debug
-                }
-            }
-        }
-
-        flutter {
-            source '../..'
-        }
-        GRADLE_EOF
+        sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle
+        sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 34/g' android/app/build.gradle
+        sed -i 's/targetSdkVersion flutter.targetSdkVersion/targetSdkVersion 34/g' android/app/build.gradle
 
     - name: Get Dependencies
       run: flutter pub get

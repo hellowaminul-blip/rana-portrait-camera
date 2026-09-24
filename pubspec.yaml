@@ -13,7 +13,8 @@ dependencies:
   http: ^1.2.0
   path_provider: ^2.1.2
   image_picker: ^1.0.7
-  gal: ^2.3.0
+  image_gallery_saver: ^2.0.3
+  permission_handler: ^11.3.0
 
 flutter:
   uses-material-design: true
