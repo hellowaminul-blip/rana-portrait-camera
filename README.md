@@ -1,2 +1,0 @@
-# rana-portrait-camera
-Camera
