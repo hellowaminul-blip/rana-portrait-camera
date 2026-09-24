@@ -29,9 +29,11 @@ jobs:
         cp -r temp_app/ios .
         rm -rf temp_app
 
-    - name: Update minSdkVersion for Camera Package
+    - name: Update Android SDK Versions for New Packages
       run: |
         sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle
+        sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 34/g' android/app/build.gradle
+        sed -i 's/targetSdkVersion flutter.targetSdkVersion/targetSdkVersion 34/g' android/app/build.gradle
 
     - name: Get Dependencies
       run: flutter pub get
